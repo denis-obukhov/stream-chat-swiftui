@@ -114,10 +114,14 @@ public struct ReactionIcon: View {
     }
     
     public var body: some View {
-        Image(uiImage: icon)
+        let image = Image(uiImage: icon)
             .resizable()
             .scaledToFit()
-            .foregroundColor(color)
+        if let color {
+            image.foregroundColor(color)
+        } else {
+            image
+        }
     }
 }
 

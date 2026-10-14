@@ -13,15 +13,18 @@ struct ReactionsOverlayContainer: View {
     let message: ChatMessage
     let contentRect: CGRect
     var onReactionTap: (MessageReactionType) -> Void
+    var onMoreReactionsTap: () -> Void
 
     init(
         message: ChatMessage,
         contentRect: CGRect,
-        onReactionTap: @escaping (MessageReactionType) -> Void
+        onReactionTap: @escaping (MessageReactionType) -> Void,
+        onMoreReactionsTap: @escaping () -> Void = { }
     ) {
         self.message = message
         self.contentRect = contentRect
         self.onReactionTap = onReactionTap
+        self.onMoreReactionsTap = onMoreReactionsTap
     }
 
     var body: some View {
@@ -31,7 +34,8 @@ struct ReactionsOverlayContainer: View {
                     message: message,
                     useLargeIcons: true,
                     reactions: reactions,
-                    onReactionTap: onReactionTap
+                    onReactionTap: onReactionTap,
+                    onMoreReactionsTap: onMoreReactionsTap
                 )
             }
 
@@ -47,14 +51,16 @@ struct ReactionsOverlayContainer: View {
     }
 
     private var reactions: [MessageReactionType] {
-        images.availableReactions.keys
+        images.availableMessagesReactionEmojis.keys
             .map { $0 }
             .sorted(by: utils.sortReactions)
     }
 
     private var reactionsSize: CGFloat {
-        let entrySize = 28
-        return CGFloat(reactions.count * entrySize)
+        let entrySize: CGFloat = 36
+        let spacing: CGFloat = 12
+        let count = CGFloat(reactions.count + 1)
+        return count * entrySize + spacing * max(0, count - 1)
     }
 }
 
@@ -84,12 +90,12 @@ public extension ChatMessage {
 
 public struct ReactionsAnimatableView: View {
     @Injected(\.colors) private var colors
-    @Injected(\.images) private var images
 
     let message: ChatMessage
     var useLargeIcons = false
     var reactions: [MessageReactionType]
     var onReactionTap: (MessageReactionType) -> Void
+    var onMoreReactionsTap: () -> Void
 
     @State var animationStates: [CGFloat]
 
@@ -97,19 +103,21 @@ public struct ReactionsAnimatableView: View {
         message: ChatMessage,
         useLargeIcons: Bool = false,
         reactions: [MessageReactionType],
-        onReactionTap: @escaping (MessageReactionType) -> Void
+        onReactionTap: @escaping (MessageReactionType) -> Void,
+        onMoreReactionsTap: @escaping () -> Void = { }
     ) {
         self.message = message
         self.useLargeIcons = useLargeIcons
         self.reactions = reactions
         self.onReactionTap = onReactionTap
+        self.onMoreReactionsTap = onMoreReactionsTap
         _animationStates = State(
             initialValue: [CGFloat](repeating: 0, count: reactions.count)
         )
     }
 
     public var body: some View {
-        HStack {
+        HStack(spacing: 12) {
             ForEach(reactions) { reaction in
                 ReactionAnimatableView(
                     message: message,
@@ -120,6 +128,20 @@ public struct ReactionsAnimatableView: View {
                     onReactionTap: onReactionTap
                 )
             }
+            Button {
+                onMoreReactionsTap()
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(Color(colors.text))
+                    .padding(.all, 6)
+            }
+            .frame(width: 32, height: 32)
+            .overlay(
+                Circle().strokeBorder(Color(colors.innerBorder), lineWidth: 1)
+            )
+            .accessibilityLabel("More reactions")
+            .accessibilityIdentifier("moreReactions")
         }
         .padding(.all, 6)
         .padding(.horizontal, 4)
@@ -129,7 +151,6 @@ public struct ReactionsAnimatableView: View {
 
 public struct ReactionAnimatableView: View {
     @Injected(\.colors) private var colors
-    @Injected(\.images) private var images
 
     let message: ChatMessage
     let reaction: MessageReactionType
@@ -159,11 +180,7 @@ public struct ReactionAnimatableView: View {
             Button {
                 onReactionTap(reaction)
             } label: {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundColor(color(for: reaction))
-                    .frame(width: useLargeIcons ? 25 : 20, height: useLargeIcons ? 27 : 20)
+                reactionImage(image)
             }
             .background(reactionSelectedBackgroundColor(for: reaction).cornerRadius(8))
             .scaleEffect(index(for: reaction) != nil ? animationStates[index(for: reaction)!] : 1)
@@ -205,24 +222,25 @@ public struct ReactionAnimatableView: View {
         return index
     }
 
-    private func iconProvider(for reaction: MessageReactionType) -> UIImage? {
-        if useLargeIcons {
-            return images.availableReactions[reaction]?.largeIcon
+    @ViewBuilder
+    private func reactionImage(_ image: UIImage) -> some View {
+        let imageView = Image(uiImage: image)
+            .resizable()
+            .scaledToFit()
+            .frame(width: useLargeIcons ? 25 : 20, height: useLargeIcons ? 27 : 20)
+        if let tint = color(for: reaction) {
+            imageView.foregroundColor(tint)
         } else {
-            return images.availableReactions[reaction]?.smallIcon
+            imageView
         }
     }
 
-    private func color(for reaction: MessageReactionType) -> Color? {
-        var colors = colors
-        let containsUserReaction = userReactionIDs.contains(reaction)
-        let color = containsUserReaction ? colors.reactionCurrentUserColor : colors.reactionOtherUserColor
+    private func iconProvider(for reaction: MessageReactionType) -> UIImage? {
+        ReactionsIconProvider.icon(for: reaction, useLargeIcons: useLargeIcons)
+    }
 
-        if let color = color {
-            return Color(color)
-        } else {
-            return nil
-        }
+    private func color(for reaction: MessageReactionType) -> Color? {
+        ReactionsIconProvider.color(for: reaction, userReactionIDs: userReactionIDs)
     }
 
     private var userReactionIDs: Set<MessageReactionType> {

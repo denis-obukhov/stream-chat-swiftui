@@ -19,6 +19,7 @@ public struct ReactionsOverlayView<Factory: ViewFactory>: View {
     @State private var initialWidth: CGFloat?
     @State private var orientationChanged = false
     @State private var initialOrigin: CGFloat?
+    @State private var moreReactionsShown = false
 
     var factory: Factory
     var channel: ChatChannel
@@ -141,6 +142,9 @@ public struct ReactionsOverlayView<Factory: ViewFactory>: View {
                                     dismissReactionsOverlay {
                                         viewModel.reactionTapped(reaction)
                                     }
+                                },
+                                onMoreReactionsTap: {
+                                    moreReactionsShown = true
                                 }
                             )
                             .scaleEffect(popIn ? 1 : 0)
@@ -219,6 +223,16 @@ public struct ReactionsOverlayView<Factory: ViewFactory>: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ReactionsOverlayView")
+        .sheet(isPresented: $moreReactionsShown) {
+            MoreReactionsView { emojiKey in
+                moreReactionsShown = false
+                let reaction = MessageReactionType(rawValue: emojiKey)
+                dismissReactionsOverlay {
+                    viewModel.reactionTapped(reaction)
+                }
+            }
+            .modifier(MoreReactionsDetentsModifier())
+        }
         .onRotate { _ in
             if isIPad {
                 self.orientationChanged = true

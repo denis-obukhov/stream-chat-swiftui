@@ -1203,3 +1203,21 @@ public protocol ViewFactory: AnyObject {
         options: AttachmentTextViewOptions
     ) -> AttachmentTextViewType
 }
+
+extension ViewFactory {
+    /// Reaction row used by the long-press overlay, including the more-reactions button.
+    /// This is not a protocol requirement, so app factories do not have to implement it.
+    func makeReactionsContentView(
+        message: ChatMessage,
+        contentRect: CGRect,
+        onReactionTap: @escaping (MessageReactionType) -> Void,
+        onMoreReactionsTap: @escaping () -> Void
+    ) -> ReactionsOverlayContainer {
+        ReactionsOverlayContainer(
+            message: message,
+            contentRect: contentRect,
+            onReactionTap: onReactionTap,
+            onMoreReactionsTap: onMoreReactionsTap
+        )
+    }
+}
